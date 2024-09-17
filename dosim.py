@@ -22,7 +22,7 @@ def make_trivial(P):
 
     Zs = {}
     Zs['trivial-avg'] = P[:][:,:,:,:].mean(axis=(1,2))
-    Zs['trivial-flat'] = P[:].reshape((len(P), -1))
+    Zs['trivial-pixels'] = P[:].reshape((len(P), -1))
     Zs['trivial-cov'] = np.array([z.T.dot(z).flatten()
         for z in P[:].reshape((len(P), -1, P.nchannels))])    
 
