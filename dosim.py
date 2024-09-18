@@ -68,7 +68,7 @@ if __name__ == "__main__":
     # Initialize the parser
     parser = argparse.ArgumentParser(
         description="perform single simulation replicate for a specified family of methods")
-    
+
     # Add arguments
     parser.add_argument("signal_type", type=str, help="The signal type (string)")
     parser.add_argument("rep_family", type=str, help="The rep family (string)")
@@ -80,6 +80,7 @@ if __name__ == "__main__":
 
     # Parse the arguments
     args = parser.parse_args()
+    print(args)
     if args.torch_device is not None:
         torch.set_default_device(args.torch_device)
 
