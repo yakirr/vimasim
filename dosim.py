@@ -44,7 +44,7 @@ if __name__ == "__main__":
     parser.add_argument("rep_family", type=str, help="The rep family (string)")
     parser.add_argument("seed", type=int, help="The seed (integer)")
     parser.add_argument("outdir", type=str, help="Output directory")
-    parser.add_argument("--data_dir", type=str, help="Path to data", default="/Users/yakir/ST/ALZ/alz-data/10u/pca_k=10_harmony")
+    parser.add_argument("--data_dir", type=str, help="Path to data", default="/data/srlab1/yakir/ST/ALZ/alz-data/10u/pca_k=10_harmony")
     parser.add_argument("--npcs", type=int, help="number of PCs to use for building UMAP; if none then no PCA used.", default=20)
 
     # Parse the arguments
@@ -53,6 +53,7 @@ if __name__ == "__main__":
     # Read data
     print('reading samples')
     samples = tds.read_samples(f'{args.data_dir}/*.nc', tds.default_parser)#, stop_after=10)
+    gc.collect()
 
     # Spike in signal
     print('adding in case/ctrl signal')
@@ -91,7 +92,7 @@ if __name__ == "__main__":
 
     # Perform two case-control anlayses for each representation and noise level
     results = pd.DataFrame(columns=['repname', 'style', 'noise', 'P', 'accuracy'])
-    noises = [0, 0.25, 0.5]
+    noises = [0, 0.1, 0.2]
     for repname, D in Ds.items():
         for noise in noises:
             D.samplem['noisy_case'] = (D.samplem.case + np.random.binomial(1, noise, size=D.N)) % 2

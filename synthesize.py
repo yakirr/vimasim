@@ -12,7 +12,7 @@ def get_region(s, cell_types=['L2/3 IT']):
     layer = xr.zeros_like(mask)
 
     # find cells
-    mycells = cells[cells.Section == f'{s.attrs['donor']}_{s.attrs['sid']}']
+    mycells = cells[cells.Section == f"{s.attrs['donor']}_{s.attrs['sid']}"]
     mycells_ = mycells[mycells.subclass_name.isin(cell_types)]
     for x, y in mycells_[['x','y']].values:
         nearest = layer.sel(x=x, y=y, method='nearest')
@@ -23,9 +23,7 @@ def get_region(s, cell_types=['L2/3 IT']):
     layer.data = cv2.morphologyEx(layer.data.astype(np.uint8), cv2.MORPH_OPEN, np.ones((10,10),np.uint8)) 
     return layer.astype('bool')
 
-def add_aggregates_v_diffuse(samples, pc='hPC2', seed=0, plot=False):
-    np.random.seed(seed)
-
+def add_aggregates_v_diffuse(samples, pc='hPC2', plot=False):
     # determine case/ctrl status
     samplemeta = pd.DataFrame({'donor':[s.attrs['donor'] for s in samples.values()]},
                                index=[s.attrs['sid'] for s in samples.values()]).drop_duplicates()
