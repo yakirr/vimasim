@@ -29,10 +29,36 @@ def make_trivial(P):
     return Zs
 
 def make_simplecnn(P):
-    return
+    modelparams = {
+        'ncolors':P.nchannels,
+        'patch_size':patchsize,
+        'nfilters1':512,
+        'nfilters2':1024,
+    }
+    model = tm.CVAE(**modelparams)
+
+    P.pytorch_mode()
+    P.augmentation_on()
+    train_dataset, val_dataset = tm.train_test_split(P)
+
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
+    model, losslogs = tm.full_training(model, train_dataset, val_dataset, optimizer, scheduler, batch_size=256, n_epochs=10,
+                                    kl_weight=1/(patchsize*patchsize*P.nchannels))
+
+    P.augmentation_off()
+    _, Z = tm.evaluate(model, P, detailed=True)
+    return {'simplecnn-latent': Z}
+    
 
 def make_resnet(P):
     return
+
+signal_makers = {
+    'trivial' : make_trivial,
+    'simplecnn' : make_simplecnn,
+    'resnet' : make_resnet
+}
 
 if __name__ == "__main__":
     # Initialize the parser
@@ -67,19 +93,14 @@ if __name__ == "__main__":
     # Generate patches
     print('choosing patches')
     patchsize = 40; patchstride = 10
-    patchmeta = tds.choose_patches(samples, patchsize, patchstride, max_frac_empty=0.8) #0.2)
+    patchmeta = tds.choose_patches(samples, patchsize, patchstride, max_frac_empty=0.8)#0.2)
     synthesize.annotate_patches(patchmeta, region_masks)
     P = tdp.PatchCollection(patchmeta, samples, standardize=True)
     print(len(patchmeta), 'patches generated')
 
     # Generate representations
     print('making representations')
-    if args.rep_family == 'trivial':
-        Zs = make_trivial(P)
-    elif args.rep_family == 'simplecnn':
-        Zs = make_simplecnn(P)
-    elif args.rep_family == 'resnet':
-        Zs = make_resnet(P)
+    Zs = signal_makers[args.rep_family](P)
 
     # Generate anndata
     print('making anndata objects')
