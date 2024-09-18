@@ -115,14 +115,21 @@ if __name__ == "__main__":
         }
 
     # Perform two case-control anlayses for each representation and noise level
-    results = pd.DataFrame(columns=['repname', 'style', 'noise', 'P', 'accuracy'])
+    results = pd.DataFrame(columns=['signal', 'repname', 'style', 'noise', 'P', 'accuracy'])
     noises = [0, 0.1, 0.2]
     for repname, D in Ds.items():
         for noise in noises:
             D.samplem['noisy_case'] = (D.samplem.case + np.random.binomial(1, noise, size=D.N)) % 2
             for style, cc in [('clust', tpaesim.cc.cluster_cc), ('cna', tpaesim.cc.cna_cc)]:
                 p, accuracy = cc(D)
-                results.loc[len(results)] = {"repname": repname, "style": style, "noise": noise, "P": p, "accuracy": accuracy}
+                results.loc[len(results)] = {
+                    "signal": args.signal_type,
+                    "repname": repname,
+                    "style": style,
+                    "noise": noise,
+                    "P": p,
+                    "accuracy": accuracy
+                    }
                 print(results.iloc[-1])
 
     # Write output as tsv with repname, p, accuracy
