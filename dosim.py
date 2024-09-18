@@ -14,7 +14,6 @@ import xarray as xr
 import argparse
 
 import torch
-torch.set_default_device('mps') # for running on Yakir's macbook's GPU
 
 def make_trivial(P):
     P.augmentation_off()
@@ -72,9 +71,12 @@ if __name__ == "__main__":
     parser.add_argument("outdir", type=str, help="Output directory")
     parser.add_argument("--data_dir", type=str, help="Path to data", default="/data/srlab1/yakir/ST/ALZ/alz-data/10u/pca_k=10_harmony")
     parser.add_argument("--npcs", type=int, help="number of PCs to use for building UMAP; if none then no PCA used.", default=20)
+    parser.add_argument("--torch-device", type=str, help="Device to send pytorch tensors to. mps for Apple.", default=None)
 
     # Parse the arguments
     args = parser.parse_args()
+    if args.torch_device is not None:
+        torch.set_default_device(args.torch_device)
 
     # Read data
     print('reading samples')
