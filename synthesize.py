@@ -23,14 +23,45 @@ def get_region(s, cell_types=['L2/3 IT']):
     layer.data = cv2.morphologyEx(layer.data.astype(np.uint8), cv2.MORPH_OPEN, np.ones((10,10),np.uint8)) 
     return layer.astype('bool')
 
-def add_aggregates_v_diffuse(samples, pc='hPC2', plot=False):
-    # determine case/ctrl status
+def set_cc(samples):
     samplemeta = pd.DataFrame({'donor':[s.attrs['donor'] for s in samples.values()]},
                                index=[s.attrs['sid'] for s in samples.values()]).drop_duplicates()
     samples = {sid:samples[sid] for sid in samplemeta.index}
     cases = np.random.choice(samplemeta.index, size=len(samplemeta)//2, replace=False)
     samplemeta['case'] = 0
     samplemeta.loc[cases, 'case'] = 1
+    return samples, samplemeta
+
+def define_tissue_and_region(s):
+    tissue_mask = cv2.morphologyEx(tds.get_mask(s).data.astype(np.uint8), cv2.MORPH_CLOSE,
+                                  cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (40,40))).astype('bool')
+    region_mask = get_region(s).data
+    region_mask = region_mask & tissue_mask
+    return tissue_mask, region_mask
+
+def plot_changes(tissue_mask, region_mask, newpx_case, newpx_ctrl, celltype, dist):
+    ax = plt.subplot(1,3,1)
+    plt.imshow(0.5*tissue_mask[::-1,:] + region_mask[::-1,:], vmin=0, vmax=1)
+    plt.title('region')
+    ax = plt.subplot(1,3,2)
+    plt.imshow(newpx_case[::-1,:], vmin=0, vmax=2)
+    plt.title('case')
+    ax = plt.subplot(1,3,3)
+    plt.imshow(newpx_ctrl[::-1,:], vmin=0, vmax=2)
+    plt.title('ctrl')
+    plt.show()
+
+    ax = plt.subplot(1,2,1)
+    (celltype-dist).plot(ax=ax)
+    ax.axis('equal')
+    ax = plt.subplot(1,2,2)
+    celltype.plot(ax=ax)
+    ax.axis('equal')
+    plt.show()
+
+def add_aggregates_v_diffuse(samples, pc='hPC2', plot=False):
+    # determine case/ctrl status
+    samples, samplemeta = set_cc(samples)
 
     # add in signal
     region_masks = {}
@@ -39,11 +70,7 @@ def add_aggregates_v_diffuse(samples, pc='hPC2', plot=False):
         s = samples[sid]
 
         # determine tissue boundaries and region of interest
-        tissue_mask = cv2.morphologyEx(tds.get_mask(s).data.astype(np.uint8), cv2.MORPH_CLOSE,
-                                      cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (40,40))).astype('bool')
-        region_mask = get_region(s).data
-        region_mask = region_mask & tissue_mask
-        region_masks[sid] = region_mask
+        tissue_mask, region_masks[sid] = define_tissue_and_region(s)
 
         # create case and ctrl signals
         celltype = s.sel(marker=pc)
@@ -52,10 +79,10 @@ def add_aggregates_v_diffuse(samples, pc='hPC2', plot=False):
         newpx_ctrl = cv2.GaussianBlur(celltype_mask, (51,51), 0)
         
         # normalize
-        newpx_case[~region_mask] = 0
-        newpx_case *= (region_mask.flatten().sum() / newpx_case.flatten().sum())
-        newpx_ctrl[~region_mask] = 0
-        newpx_ctrl *= (region_mask.flatten().sum() / newpx_ctrl.flatten().sum())
+        newpx_case[~region_masks[sid]] = 0
+        newpx_case *= (region_masks[sid].flatten().sum() / newpx_case.flatten().sum())
+        newpx_ctrl[~region_masks[sid]] = 0
+        newpx_ctrl *= (region_masks[sid].flatten().sum() / newpx_ctrl.flatten().sum())
         
         # add
         dist = newpx_case if r.case == 1 else newpx_ctrl
@@ -63,24 +90,44 @@ def add_aggregates_v_diffuse(samples, pc='hPC2', plot=False):
 
         # visualize
         if plot:
-            ax = plt.subplot(1,3,1)
-            plt.imshow(0.5*tissue_mask[::-1,:] + region_mask[::-1,:], vmin=0, vmax=1)
-            plt.title('region')
-            ax = plt.subplot(1,3,2)
-            plt.imshow(newpx_case[::-1,:], vmin=0, vmax=2)
-            plt.title('case')
-            ax = plt.subplot(1,3,3)
-            plt.imshow(newpx_ctrl[::-1,:], vmin=0, vmax=2)
-            plt.title('ctrl')
-            plt.show()
+            plot_changes(tissue_mask, region_masks[sid], newpx_case, newpx_ctrl, celltype, dist)
 
-            ax = plt.subplot(1,2,1)
-            (celltype-dist).plot(ax=ax)
-            ax.axis('equal')
-            ax = plt.subplot(1,2,2)
-            celltype.plot(ax=ax)
-            ax.axis('equal')
-            plt.show()
+    return samples, samplemeta, region_masks
+
+def add_linear_v_circular(samples, pc='hPC2', plot=False):
+    # determine case/ctrl status
+    samples, samplemeta = set_cc(samples)
+
+    # add in signal
+    region_masks = {}
+    for sid, r in samplemeta.iterrows():
+        print(sid, r.case, end='|')
+        s = samples[sid]
+
+        # determine tissue boundaries and region of interest
+        tissue_mask, region_masks[sid] = define_tissue_and_region(s)
+
+        # create case and ctrl signals
+        celltype = s.sel(marker=pc)
+        celltype_mask = celltype.where(celltype > 5, other=0).data
+        rectangle = cv2.getStructuringElement(cv2.MORPH_RECT,(11,3))
+        circle = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(7,7))
+        newpx_case = cv2.filter2D(celltype_mask, -1, rectangle)
+        newpx_ctrl = cv2.filter2D(celltype_mask, -1, circle)
+        
+        # normalize
+        newpx_case[~region_masks[sid]] = 0
+        newpx_case *= (region_masks[sid].flatten().sum() / newpx_case.flatten().sum())
+        newpx_ctrl[~region_masks[sid]] = 0
+        newpx_ctrl *= (region_masks[sid].flatten().sum() / newpx_ctrl.flatten().sum())
+        
+        # add
+        dist = newpx_case if r.case == 1 else newpx_ctrl
+        celltype += dist
+
+        # visualize
+        if plot:
+            plot_changes(tissue_mask, region_masks[sid], newpx_case, newpx_ctrl, celltype, dist)
 
     return samples, samplemeta, region_masks
 

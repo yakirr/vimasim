@@ -53,7 +53,12 @@ def make_simplecnn(P):
 def make_resnet(P):
     return
 
-signal_makers = {
+signal_adders = {
+    'agg_v_diffuse' : synthesize.add_aggregates_v_diffuse,
+    'linear_v_circular' : synthesize.add_linear_v_circular
+}
+
+rep_makers = {
     'trivial' : make_trivial,
     'simplecnn' : make_simplecnn,
     'resnet' : make_resnet
@@ -86,11 +91,7 @@ if __name__ == "__main__":
     # Spike in signal
     print('adding in case/ctrl signal')
     np.random.seed(args.seed)
-    if args.signal_type == 'agg_v_diffuse':
-        samples, samplemeta, region_masks = synthesize.add_aggregates_v_diffuse(samples, plot=False)
-    else:
-        #todo
-        pass
+    samples, samplemeta, region_masks = signal_adders[args.signal_type](samples, plot=False)
 
     # Generate patches
     print('choosing patches')
@@ -102,7 +103,7 @@ if __name__ == "__main__":
 
     # Generate representations
     print('making representations')
-    Zs = signal_makers[args.rep_family](P)
+    Zs = rep_makers[args.rep_family](P)
 
     # Generate anndata
     print('making anndata objects')
