@@ -12,6 +12,7 @@ import gc, os
 import cv2 as cv2
 import xarray as xr
 import argparse
+import os.path
 
 import torch
 
@@ -36,25 +37,30 @@ def make_simplecnn(P, modelfilename, n_epochs):
         'nfilters2':1024,
     }
     model = SimpleVAE(**modelparams)
-    train_dataset, val_dataset = tt.train_test_split(P)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
-    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
-    model, losslogs = tt.full_training(model, train_dataset, val_dataset, optimizer, scheduler, batch_size=256, n_epochs=n_epochs,
-                                    kl_weight=1/(patchsize*patchsize*P.nchannels))
-    torch.save(model.state_dict(), modelfilename)
+    if os.path.isfile(modelfilename):
+        model.load_state_dict(torch.load(modelfilename))
+    else:
+        train_dataset, val_dataset = tt.train_test_split(P)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
+        model, losslogs = tt.full_training(model, train_dataset, val_dataset, optimizer, scheduler, batch_size=256, n_epochs=n_epochs,
+                                        kl_weight=1/(patchsize*patchsize*P.nchannels))
+        torch.save(model.state_dict(), modelfilename)
 
     return {'simplecnn-latent': ta.apply(model, P)}
 
 def make_resnet(P, modelfilename, n_epochs):
     from tpae.models.resnet_vae import ResnetVAE
     model = ResnetVAE(network='light', ncolors=P.nchannels)
-
-    train_dataset, val_dataset = tt.train_test_split(P)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
-    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
-    model, losslogs = tt.full_training(model, train_dataset, val_dataset, optimizer, scheduler, batch_size=256, n_epochs=n_epochs,
-                                    kl_weight=1/(patchsize*patchsize*P.nchannels))
-    torch.save(model.state_dict(), modelfilename)
+    if os.path.isfile(modelfilename):
+        model.load_state_dict(torch.load(modelfilename))
+    else:
+        train_dataset, val_dataset = tt.train_test_split(P)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
+        model, losslogs = tt.full_training(model, train_dataset, val_dataset, optimizer, scheduler, batch_size=256, n_epochs=n_epochs,
+                                        kl_weight=1/(patchsize*patchsize*P.nchannels))
+        torch.save(model.state_dict(), modelfilename)
 
     Zs = {}
     Z = ta.apply(model, P, embedding=model.penultimate_layer)
@@ -100,6 +106,7 @@ if __name__ == "__main__":
         stop_after=10; max_frac_empty=0.2; n_epochs=1
     else:
         stop_after=None; max_frac_empty=0.8; n_epochs=10
+    outstem = f'{args.outdir}/{args.signal_type}.{args.rep_family}.{args.seed}'
 
     # Read data
     print('reading samples')
@@ -123,7 +130,7 @@ if __name__ == "__main__":
     print('making representations')
     Zs = rep_makers[args.rep_family](
         P,
-        f'{args.outdir}/{args.signal_type}.{args.rep_family}.{args.seed}.model.pt',
+        f'{outstem}.model.pt',
         n_epochs)
 
     # Generate anndata
@@ -137,11 +144,18 @@ if __name__ == "__main__":
 
     # Perform two case-control anlayses for each representation and noise level
     results = pd.DataFrame(columns=['signal', 'repname', 'style', 'noise', 'P'] + tpaesim.cc.metric_names())
-    noises = [0, 0.1, 0.2]
+    # noises = [0, 0.1, 0.2]
+    noises = [0.3, 0.4, 0.5]
+
+    if os.path.isfile(f'{outstem}.tsv'):
+        results = pd.read_csv(f'{outstem}.tsv', sep='\t')
     for repname, D in Ds.items():
         for noise in noises:
             D.samplem['noisy_case'] = (D.samplem.case + np.random.binomial(1, noise, size=D.N)) % 2
-            for style, cc in [('clust', tpaesim.cc.cluster_cc), ('cna', tpaesim.cc.cna_cc)]:
+            for style, cc in [
+                    # ('clust', tpaesim.cc.cluster_cc),
+                    ('cna', tpaesim.cc.cna_cc),
+                    ]:
                 p, metrics = cc(D)
                 results.loc[len(results)] = {
                     "signal": args.signal_type,
@@ -154,4 +168,4 @@ if __name__ == "__main__":
                 print(results.iloc[-1])
                 
                 # Write output as tsv with repname, p, accuracy
-                results.to_csv(f'{args.outdir}/{args.signal_type}.{args.rep_family}.{args.seed}.tsv', sep='\t', index=False)
+                results.to_csv(f'{outstem}.tsv', sep='\t', index=False)
