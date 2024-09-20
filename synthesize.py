@@ -110,7 +110,7 @@ def add_linear_v_circular(samples, pc='hPC2', plot=False):
         # create case and ctrl signals
         celltype = s.sel(marker=pc)
         celltype_mask = celltype.where(celltype > 5, other=0).data
-        rectangle = cv2.getStructuringElement(cv2.MORPH_RECT,(11,3))
+        rectangle = cv2.getStructuringElement(cv2.MORPH_RECT,(33,1))
         circle = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(7,7))
         newpx_case = cv2.filter2D(celltype_mask, -1, rectangle)
         newpx_ctrl = cv2.filter2D(celltype_mask, -1, circle)
