@@ -77,8 +77,14 @@ signal_adders = {
 
 rep_makers = {
     'trivial' : make_trivial,
-    'simplecnn' : make_simplecnn,
-    'resnet' : make_resnet
+    'simplecnn_kl1' : lambda *x: make_simplecnn(*x, 0.1/(64*10*10)),
+    'simplecnn_kl2' : lambda *x: make_simplecnn(*x, 1/(64*10*10)),
+    'simplecnn_kl3' : lambda *x: make_simplecnn(*x, 5/(64*10*10)),
+    'simplecnn_kl4' : lambda *x: make_simplecnn(*x, 10/(64*10*10)),
+    'resnet_kl1' : lambda *x: make_resnet(*x, 0.1/(64*10*10)),
+    'resnet_kl2' : lambda *x: make_resnet(*x, 1/(64*10*10)),
+    'resnet_kl3' : lambda *x: make_resnet(*x, 5/(64*10*10)),
+    'resnet_kl4' : lambda *x: make_resnet(*x, 10/(64*10*10)),
 }
 
 if __name__ == "__main__":
@@ -135,8 +141,8 @@ if __name__ == "__main__":
 
     # Generate anndata
     print('making anndata objects')
-    kwargs = {'use_rep':'X_pca', 'n_comps':args.npcs} if args.npcs is not None else {'use_rep':'X'}
-    suffix = f'-{args.npcs}pcs' if args.npcs is not None else '-raw'
+    kwargs = {'use_rep':'X_pca', 'n_comps':args.npcs} if args.npcs != -1 else {'use_rep':'X'}
+    suffix = f'-{args.npcs}pcs' if args.npcs != -1 else '-raw'
     Ds = {
         repname+suffix : ta.anndata(P.meta, Z, samplemeta, sampleid='sid', **kwargs)
         for repname, Z in Zs.items()
@@ -144,8 +150,7 @@ if __name__ == "__main__":
 
     # Perform two case-control anlayses for each representation and noise level
     results = pd.DataFrame(columns=['signal', 'repname', 'style', 'noise', 'P'] + tpaesim.cc.metric_names())
-    # noises = [0, 0.1, 0.2]
-    noises = [0.3, 0.4, 0.5]
+    noises = [0, 0.1, 0.2, 0.3, 0.4, 0.5]
 
     if os.path.isfile(f'{outstem}.tsv'):
         results = pd.read_csv(f'{outstem}.tsv', sep='\t')
