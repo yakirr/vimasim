@@ -28,7 +28,7 @@ def make_trivial(P, modelfilename, n_epochs):
 
     return Zs
 
-def make_simplecnn(P, modelfilename, n_epochs):
+def make_simplecnn(P, modelfilename, n_epochs, kl_weight, stem):
     from tpae.models.simple_vae import SimpleVAE
     modelparams = {
         'ncolors':P.nchannels,
@@ -44,29 +44,29 @@ def make_simplecnn(P, modelfilename, n_epochs):
         optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
         model, losslogs = tt.full_training(model, train_dataset, val_dataset, optimizer, scheduler, batch_size=256, n_epochs=n_epochs,
-                                        kl_weight=1/(patchsize*patchsize*P.nchannels))
+                                        kl_weight=kl_weight)
         torch.save(model.state_dict(), modelfilename)
 
-    return {'simplecnn-latent': ta.apply(model, P)}
+    return {f'simplecnn{stem}-latent': ta.apply(model, P)}
 
-def make_resnet(P, modelfilename, n_epochs):
+def make_resnet(P, modelfilename, n_epochs, kl_weight, stem):
     from tpae.models.resnet_vae import ResnetVAE
     model = ResnetVAE(network='light', ncolors=P.nchannels)
     if os.path.isfile(modelfilename):
         model.load_state_dict(torch.load(modelfilename))
     else:
         train_dataset, val_dataset = tt.train_test_split(P)
-        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-2)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
         model, losslogs = tt.full_training(model, train_dataset, val_dataset, optimizer, scheduler, batch_size=256, n_epochs=n_epochs,
-                                        kl_weight=1/(patchsize*patchsize*P.nchannels))
+                                        kl_weight=kl_weight)
         torch.save(model.state_dict(), modelfilename)
 
     Zs = {}
     Z = ta.apply(model, P, embedding=model.penultimate_layer)
-    Zs['resnet-pixels'] = Z.reshape((len(Z), -1))
-    Zs['resnet-avg'] = Z.reshape((len(Z), 64, -1)).mean(axis=2)
-    Zs['resnet-cov'] = np.array([z.dot(z.T)[np.triu_indices(64)] for z in Z.reshape((len(Z), 64, -1))])
+    Zs[f'resnet{stem}-pixels'] = Z.reshape((len(Z), -1))
+    Zs[f'resnet{stem}-avg'] = Z.reshape((len(Z), 64, -1)).mean(axis=2)
+    Zs[f'resnet{stem}-cov'] = np.array([z.dot(z.T)[np.triu_indices(64)] for z in Z.reshape((len(Z), 64, -1))])
 
     return Zs
 
@@ -77,14 +77,16 @@ signal_adders = {
 
 rep_makers = {
     'trivial' : make_trivial,
-    'simplecnn_kl1' : lambda *x: make_simplecnn(*x, 0.1/(64*10*10)),
-    'simplecnn_kl2' : lambda *x: make_simplecnn(*x, 1/(64*10*10)),
-    'simplecnn_kl3' : lambda *x: make_simplecnn(*x, 5/(64*10*10)),
-    'simplecnn_kl4' : lambda *x: make_simplecnn(*x, 10/(64*10*10)),
-    'resnet_kl1' : lambda *x: make_resnet(*x, 0.1/(64*10*10)),
-    'resnet_kl2' : lambda *x: make_resnet(*x, 1/(64*10*10)),
-    'resnet_kl3' : lambda *x: make_resnet(*x, 5/(64*10*10)),
-    'resnet_kl4' : lambda *x: make_resnet(*x, 10/(64*10*10)),
+    'simplecnn_kl1' : lambda *x: make_simplecnn(*x, 0.1/100, '_kl1'),
+    'simplecnn_kl2' : lambda *x: make_simplecnn(*x, 1/100, '_kl2'),
+    'simplecnn_kl3' : lambda *x: make_simplecnn(*x, 5/100, '_kl3'),
+    'simplecnn_kl4' : lambda *x: make_simplecnn(*x, 10/100, '_kl4'),
+    'simplecnn_kl5' : lambda *x: make_simplecnn(*x, 20/100, '_kl5'),
+    'resnet_kl1' : lambda *x: make_resnet(*x, 0.1/(64*10*10), '_kl1'),
+    'resnet_kl2' : lambda *x: make_resnet(*x, 1/(64*10*10), '_kl2'),
+    'resnet_kl3' : lambda *x: make_resnet(*x, 5/(64*10*10), '_kl3'),
+    'resnet_kl4' : lambda *x: make_resnet(*x, 10/(64*10*10), '_kl4'),
+    'resnet_kl5' : lambda *x: make_resnet(*x, 20/(64*10*10), '_kl5'),
 }
 
 if __name__ == "__main__":

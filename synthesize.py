@@ -40,15 +40,19 @@ def define_tissue_and_region(s):
     return tissue_mask, region_mask
 
 def plot_changes(tissue_mask, region_mask, newpx_case, newpx_ctrl, celltype, dist):
-    ax = plt.subplot(1,3,1)
-    plt.imshow(0.5*tissue_mask[::-1,:] + region_mask[::-1,:], vmin=0, vmax=1)
-    plt.title('region')
-    ax = plt.subplot(1,3,2)
-    plt.imshow(newpx_case[::-1,:], vmin=0, vmax=2)
-    plt.title('case')
-    ax = plt.subplot(1,3,3)
-    plt.imshow(newpx_ctrl[::-1,:], vmin=0, vmax=2)
-    plt.title('ctrl')
+    fig, axs = plt.subplots(1,3,figsize=(9,3))
+    ax = axs[0]
+    ax.imshow(0.5*tissue_mask[::-1,:] + region_mask[::-1,:], vmin=0, vmax=1)
+    ax.set_title('region')
+    ax.axis('off')
+    ax = axs[1]
+    ax.imshow(newpx_case[::-1,:], vmin=0, vmax=2)
+    ax.set_title('case')
+    ax.axis('off')
+    ax = axs[2]
+    ax.imshow(newpx_ctrl[::-1,:], vmin=0, vmax=2)
+    ax.set_title('ctrl')
+    ax.axis('off')
     plt.show()
 
     ax = plt.subplot(1,2,1)
