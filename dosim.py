@@ -51,7 +51,7 @@ def make_simplecnn(P, modelfilename, n_epochs, kl_weight, stem):
 
 def make_resnetsimple(P, modelfilename, n_epochs, kl_weight, stem):
     from tpae.models.resnet_vae import ResnetVAE
-    model = ResnetVAE(network='light', mode='simple', ncolors=P.nchannels)
+    model = ResnetVAE(len(P.meta.sid.unique()), network='light', mode='simple', ncolors=P.nchannels)
     if os.path.isfile(modelfilename):
         model.load_state_dict(torch.load(modelfilename))
     else:
@@ -70,7 +70,7 @@ def make_resnetsimple(P, modelfilename, n_epochs, kl_weight, stem):
 
 def make_resnetadvanced(P, modelfilename, n_epochs, kl_weight, stem):
     from tpae.models.resnet_vae import ResnetVAE
-    model = ResnetVAE(network='light', mode='advanced', ncolors=P.nchannels)
+    model = ResnetVAE(len(P.meta.sid.unique()), network='light', mode='advanced', ncolors=P.nchannels)
     if os.path.isfile(modelfilename):
         model.load_state_dict(torch.load(modelfilename))
     else:
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     parser.add_argument("outdir", type=str, help="Output directory")
     parser.add_argument("-d", action='store_true')
     parser.add_argument("--data-dir", type=str, help="Path to data", default="/data/srlab1/yakir/ST/ALZ/alz-data/10u/pca_k=10_harmony")
-    parser.add_argument("--npcs", type=int, help="number of PCs to use for building UMAP; if none then no PCA used.", default=20)
+    parser.add_argument("--npcs", type=int, help="number of PCs to use for building UMAP; if none then no PCA used.", default=None)
     parser.add_argument("--torch-device", type=str, help="Device to send pytorch tensors to. mps for Apple.", default=None)
 
     # Parse the arguments
