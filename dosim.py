@@ -21,10 +21,10 @@ def make_trivial(P, modelfilename, n_epochs):
     P.numpy_mode()
 
     Zs = {}
-    Zs['trivial-avg'] = P[:][:,:,:,:].mean(axis=(1,2))
-    Zs['trivial-pixels'] = P[:].reshape((len(P), -1))
+    Zs['trivial-avg'] = P[:][0][:,:,:,:].mean(axis=(1,2))
+    Zs['trivial-pixels'] = P[:][0].reshape((len(P), -1))
     Zs['trivial-cov'] = np.array([z.T.dot(z)[np.triu_indices(P.nchannels)]
-        for z in P[:].reshape((len(P), -1, P.nchannels))])
+        for z in P[:][0].reshape((len(P), -1, P.nchannels))])
 
     return Zs
 
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     parser.add_argument("outdir", type=str, help="Output directory")
     parser.add_argument("-d", action='store_true')
     parser.add_argument("--data-dir", type=str, help="Path to data", default="/data/srlab1/yakir/ST/ALZ/alz-data/10u/pca_k=10_harmony")
-    parser.add_argument("--npcs", type=int, help="number of PCs to use for building UMAP; if none then no PCA used.", default=None)
+    parser.add_argument("--npcs", type=int, help="number of PCs to use for building UMAP; if none then no PCA used.", default=-1)
     parser.add_argument("--torch-device", type=str, help="Device to send pytorch tensors to. mps for Apple.", default=None)
 
     # Parse the arguments

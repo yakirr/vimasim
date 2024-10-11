@@ -57,12 +57,16 @@ def auroc(d, method):
 	return {
 		'auroc': (roc_curve(d, method, +1)[0] + roc_curve(d, method, -1)[0])/2
 	}
+def nfdr(d, method):
+	return {
+		'nfdr10': (d.obs[f'{method}_ncorr_thresh'] != 0).sum()
+	}
 
 def metrics(d, method):
-	return global_accuracy(d, method) | auroc(d, method)
+	return global_accuracy(d, method) | auroc(d, method) | nfdr(d, method)
 
 def metric_names():
-	return ['correlation', 'auroc']
+	return ['correlation', 'auroc', 'nfdr10']
 
 def cna_cc(d, seed=0, **kwargs):
 	annotate_patches(d)
@@ -70,15 +74,15 @@ def cna_cc(d, seed=0, **kwargs):
 	cna.tl.nam(d, show_progress=True, force_recompute=True)
 	np.random.seed(seed)
 	res = cna.tl.association(d, d.samplem.noisy_case == 1, allow_low_sample_size=True,
-		Nnull=10000, local_test=False, **kwargs)
+		Nnull=10000, **kwargs)
 	d.obs['cna_ncorr'] = res.ncorrs
 	print(f'P = {res.p}, used {res.k} PCs')
 
-	# if (res.fdrs.fdr <= 0.05).sum() > 0:
-	# 	thresh = res.fdrs[res.fdrs.fdr <= 0.05].threshold.iloc[0]
-	# else:
-	# 	thresh = 1.1
-	# d.obs['cna_ncorr_thresh'] = res.ncorrs * (np.abs(res.ncorrs >= thresh))
+	if (res.fdrs.fdr <= 0.1).sum() > 0:
+		thresh = res.fdrs[res.fdrs.fdr <= 0.1].threshold.iloc[0]
+	else:
+		thresh = 1.1
+	d.obs['cna_ncorr_thresh'] = res.ncorrs * (np.abs(res.ncorrs >= thresh))
 	return res.p, metrics(d, 'cna')
 
 def cluster_cc(d, seed=0, Nnull=2000):
@@ -102,10 +106,10 @@ def cluster_cc(d, seed=0, Nnull=2000):
 	t = pd.Series(Ts, index=sorted(clusters))
 
 	d.obs['clust_ncorr'] = 0.
-	# d.obs['clust_ncorr_thresh'] = 0.
+	d.obs['clust_ncorr_thresh'] = 0.
 	for clust in clusters:
 		d.obs.loc[d.obs.leiden1 == clust, 'clust_ncorr'] = t.loc[clust]
-		# if p.loc[clust] * len(p) <= 0.05:
-		# 	d.obs.loc[d.obs.leiden1 == clust, 'clust_ncorr_thresh'] = t.loc[clust]
+		if p.loc[clust] * len(p) <= 0.05:
+			d.obs.loc[d.obs.leiden1 == clust, 'clust_ncorr_thresh'] = t.loc[clust]
 
 	return p.min() * len(p), metrics(d, 'clust')
