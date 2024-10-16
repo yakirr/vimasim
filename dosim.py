@@ -44,7 +44,7 @@ def make_simplecnn(P, modelfilename, n_epochs, kl_weight, stem):
         optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
         model, losslogs = tt.full_training(model, train_dataset, val_dataset, optimizer, scheduler, batch_size=256, n_epochs=n_epochs,
-                                        kl_weight=kl_weight)
+                                        kl_weight=kl_weight, kl_warmup=True)
         torch.save(model.state_dict(), modelfilename)
 
     return {f'simplecnn{stem}-latent': ta.apply(model, P)}
@@ -59,7 +59,7 @@ def make_resnetsimple(P, modelfilename, n_epochs, kl_weight, stem):
         optimizer = torch.optim.AdamW(model.parameters(), lr=1e-2)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
         model, losslogs = tt.full_training(model, train_dataset, val_dataset, optimizer, scheduler, batch_size=256, n_epochs=n_epochs,
-                                        kl_weight=kl_weight, kl_warmup=False)
+                                        kl_weight=kl_weight, kl_warmup=True)
         torch.save(model.state_dict(), modelfilename)
 
     Zs = {}
@@ -92,24 +92,15 @@ signal_adders = {
     'linear_v_circular' : synthesize.add_linear_v_circular
 }
 
+kls = [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 10]
 rep_makers = {
-    'trivial' : make_trivial,
-    'simplecnn_kl1' : lambda *x: make_simplecnn(*x, 1e-5, '_kl1'),
-    'simplecnn_kl2' : lambda *x: make_simplecnn(*x, 1e-4, '_kl2'),
-    'simplecnn_kl3' : lambda *x: make_simplecnn(*x, 1e-3, '_kl3'),
-    'simplecnn_kl4' : lambda *x: make_simplecnn(*x, 1e-2, '_kl4'),
-    'simplecnn_kl5' : lambda *x: make_simplecnn(*x, 1e-1, '_kl5'),
-    'resnetsimple_kl1' : lambda *x: make_resnetsimple(*x, 1e-5, '_kl1'),
-    'resnetsimple_kl2' : lambda *x: make_resnetsimple(*x, 1e-4, '_kl2'),
-    'resnetsimple_kl3' : lambda *x: make_resnetsimple(*x, 1e-3, '_kl3'),
-    'resnetsimple_kl4' : lambda *x: make_resnetsimple(*x, 1e-2, '_kl4'),
-    'resnetsimple_kl5' : lambda *x: make_resnetsimple(*x, 1e-1, '_kl5'),
-    'resnetadv_kl1' : lambda *x: make_resnetadvanced(*x, 1e-5, '_kl1'),
-    'resnetadv_kl2' : lambda *x: make_resnetadvanced(*x, 1e-4, '_kl2'),
-    'resnetadv_kl3' : lambda *x: make_resnetadvanced(*x, 1e-3, '_kl3'),
-    'resnetadv_kl4' : lambda *x: make_resnetadvanced(*x, 1e-2, '_kl4'),
-    'resnetadv_kl5' : lambda *x: make_resnetadvanced(*x, 1e-1, '_kl5'),
-}
+    'trivial' : make_trivial } | \
+    { f'simplecnn_kl{i+1}' : lambda *x: make_simplecnn(*x, j, f'kl{i+1}')
+        for i, j in enumerate(kls) } | \
+    { f'resnetsimple_kl{i+1}' : lambda *x: make_resnetsimple(*x, j, f'kl{i+1}')
+        for i, j in enumerate(kls) } | \
+    { f'resnetadv_kl{i+1}' : lambda *x: make_resnetadv(*x, j, f'kl{i+1}')
+        for i, j in enumerate(kls) }
 
 if __name__ == "__main__":
     # Initialize the parser
