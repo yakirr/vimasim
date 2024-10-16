@@ -87,6 +87,7 @@ def make_resnetadvanced(P, modelfilename, n_epochs, kl_weight, stem):
     return Zs
 
 signal_adders = {
+    'agg_v_nothing' : synthesize.add_aggregates_v_nothing,
     'agg_v_diffuse' : synthesize.add_aggregates_v_diffuse,
     'linear_v_circular' : synthesize.add_linear_v_circular
 }

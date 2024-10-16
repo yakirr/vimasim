@@ -63,6 +63,39 @@ def plot_changes(tissue_mask, region_mask, newpx_case, newpx_ctrl, celltype, dis
     ax.axis('equal')
     plt.show()
 
+def add_aggregates_v_nothing(samples, pc='hPC2', plot=False):
+    # determine case/ctrl status
+    samples, samplemeta = set_cc(samples)
+
+    # add in signal
+    region_masks = {}
+    for sid, r in samplemeta.iterrows():
+        print(sid, r.case, end='|')
+        s = samples[sid]
+
+        # determine tissue boundaries and region of interest
+        tissue_mask, region_masks[sid] = define_tissue_and_region(s)
+
+        # create case and ctrl signals
+        celltype = s.sel(marker=pc)
+        celltype_mask = celltype.where(celltype > 5, other=0).data
+        newpx_case = cv2.GaussianBlur(celltype_mask, (7,7), 0)
+        
+        # normalize
+        newpx_case[~region_masks[sid]] = 0
+        newpx_case *= (region_masks[sid].flatten().sum() / newpx_case.flatten().sum())
+        newpx_ctrl = np.zeros_like(newpx_case)
+        
+        # add
+        dist = newpx_case if r.case == 1 else newpx_ctrl
+        celltype += dist
+
+        # visualize
+        if plot:
+            plot_changes(tissue_mask, region_masks[sid], newpx_case, newpx_ctrl, celltype, dist)
+
+    return samples, samplemeta, region_masks
+
 def add_aggregates_v_diffuse(samples, pc='hPC2', plot=False):
     # determine case/ctrl status
     samples, samplemeta = set_cc(samples)
