@@ -104,12 +104,14 @@ def cluster_cc(d, seed=0, Nnull=2000):
 		Ts.append(-T)
 	p = pd.Series(pvals, index=sorted(clusters))
 	t = pd.Series(Ts, index=sorted(clusters))
+	t[t == np.inf] = 100
+	t[t == -np.inf] = -100
 
 	d.obs['clust_ncorr'] = 0.
 	d.obs['clust_ncorr_thresh'] = 0.
 	for clust in clusters:
 		d.obs.loc[d.obs.leiden1 == clust, 'clust_ncorr'] = t.loc[clust]
-		if p.loc[clust] * len(p) <= 0.05:
+		if p.loc[clust] * len(p) <= 0.1:
 			d.obs.loc[d.obs.leiden1 == clust, 'clust_ncorr_thresh'] = t.loc[clust]
 
 	return p.min() * len(p), metrics(d, 'clust')

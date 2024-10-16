@@ -124,7 +124,7 @@ if __name__ == "__main__":
         torch.set_default_device(args.torch_device)
 
     if args.d:
-        stop_after=10; max_frac_empty=0.2; n_epochs=1
+        stop_after=15; max_frac_empty=0.3; n_epochs=1
     else:
         stop_after=None; max_frac_empty=0.8; n_epochs=10
     outstem = f'{args.outdir}/{args.signal_type}.{args.rep_family}.{args.seed}'
@@ -173,8 +173,8 @@ if __name__ == "__main__":
         for noise in noises:
             D.samplem['noisy_case'] = (D.samplem.case + np.random.binomial(1, noise, size=D.N)) % 2
             for style, cc in [
-                    # ('clust', tpaesim.cc.cluster_cc),
-                    ('cna', tpaesim.cc.cna_cc),
+                    ('clust', tpaesim.cc.cluster_cc),
+                    #('cna', tpaesim.cc.cna_cc),
                     ]:
                 p, metrics = cc(D)
                 results.loc[len(results)] = {
