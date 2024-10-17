@@ -2,6 +2,7 @@ import scanpy as sc
 import numpy as np
 import pandas as pd
 import cna
+import gc
 from scipy.stats import ttest_ind
 from tqdm import tqdm
 pb = lambda x: tqdm(x, ncols=100)
@@ -102,6 +103,7 @@ def cluster_cc(d, seed=0, Nnull=2000):
 		null_dist = np.array([ttest_ind(abundances[col][y_==0], abundances[col][y_==1])[1] for y_ in null_ys])
 		pvals.append(((p_val >= null_dist).sum()+1)/(Nnull+1))
 		Ts.append(-T)
+		gc.collect()
 	p = pd.Series(pvals, index=sorted(clusters))
 	t = pd.Series(Ts, index=sorted(clusters))
 	t[t == np.inf] = 100

@@ -99,7 +99,7 @@ rep_makers = {
         for i, j in enumerate(kls) } | \
     { f'resnetsimple_kl{i+1}' : lambda *x: make_resnetsimple(*x, j, f'kl{i+1}')
         for i, j in enumerate(kls) } | \
-    { f'resnetadv_kl{i+1}' : lambda *x: make_resnetadv(*x, j, f'kl{i+1}')
+    { f'resnetadv_kl{i+1}' : lambda *x: make_resnetadvanced(*x, j, f'kl{i+1}')
         for i, j in enumerate(kls) }
 
 if __name__ == "__main__":
@@ -138,6 +138,7 @@ if __name__ == "__main__":
     print('adding in case/ctrl signal')
     np.random.seed(args.seed)
     samples, samplemeta, region_masks = signal_adders[args.signal_type](samples, plot=False)
+    gc.collect()
 
     # Generate patches
     print('choosing patches')
@@ -146,6 +147,8 @@ if __name__ == "__main__":
     synthesize.annotate_patches(patchmeta, region_masks)
     P = tdp.PatchCollection(patchmeta, samples, standardize=True)
     print(len(patchmeta), 'patches generated')
+    del samples
+    gc.collect()
 
     # Generate representations
     print('making representations')
@@ -153,6 +156,7 @@ if __name__ == "__main__":
         P,
         f'{outstem}.model.pt',
         n_epochs)
+    gc.collect()
 
     # Generate anndata
     print('making anndata objects')
@@ -174,7 +178,7 @@ if __name__ == "__main__":
             D.samplem['noisy_case'] = (D.samplem.case + np.random.binomial(1, noise, size=D.N)) % 2
             for style, cc in [
                     ('clust', tpaesim.cc.cluster_cc),
-                    #('cna', tpaesim.cc.cna_cc),
+                    ('cna', tpaesim.cc.cna_cc),
                     ]:
                 p, metrics = cc(D)
                 results.loc[len(results)] = {
@@ -186,6 +190,7 @@ if __name__ == "__main__":
                     **metrics
                     }
                 print(results.iloc[-1])
+                gc.collect()
                 
                 # Write output as tsv with repname, p, accuracy
                 results.to_csv(f'{outstem}.tsv', sep='\t', index=False)
