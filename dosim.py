@@ -29,6 +29,7 @@ def make_trivial(P, modelfilename, n_epochs):
     return Zs
 
 def make_simplecnn(P, modelfilename, n_epochs, kl_weight, stem):
+    print(kl_weight, stem)
     from tpae.models.simple_vae import SimpleVAE
     modelparams = {
         'ncolors':P.nchannels,
@@ -50,6 +51,7 @@ def make_simplecnn(P, modelfilename, n_epochs, kl_weight, stem):
     return {f'simplecnn{stem}-latent': ta.apply(model, P)}
 
 def make_resnetsimple(P, modelfilename, n_epochs, kl_weight, stem):
+    print(kl_weight, stem)
     from tpae.models.resnet_vae import ResnetVAE
     model = ResnetVAE(len(P.meta.sid.unique()), network='light', mode='simple', ncolors=P.nchannels)
     if os.path.isfile(modelfilename):
@@ -69,6 +71,7 @@ def make_resnetsimple(P, modelfilename, n_epochs, kl_weight, stem):
     return Zs
 
 def make_resnetadvanced(P, modelfilename, n_epochs, kl_weight, stem):
+    print(kl_weight, stem)
     from tpae.models.resnet_vae import ResnetVAE
     model = ResnetVAE(len(P.meta.sid.unique()), network='light', mode='advanced', ncolors=P.nchannels)
     if os.path.isfile(modelfilename):
@@ -95,11 +98,11 @@ signal_adders = {
 kls = [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 10]
 rep_makers = {
     'trivial' : make_trivial } | \
-    { f'simplecnn_kl{i+1}' : lambda *x: make_simplecnn(*x, j, f'kl{i+1}')
+    { f'simplecnn_kl{i+1}' : lambda *x, i=i, j=j: make_simplecnn(*x, j, f'kl{i+1}')
         for i, j in enumerate(kls) } | \
-    { f'resnetsimple_kl{i+1}' : lambda *x: make_resnetsimple(*x, j, f'kl{i+1}')
+    { f'resnetsimple_kl{i+1}' : lambda *x, i=i, j=j: make_resnetsimple(*x, j, f'kl{i+1}')
         for i, j in enumerate(kls) } | \
-    { f'resnetadv_kl{i+1}' : lambda *x: make_resnetadvanced(*x, j, f'kl{i+1}')
+    { f'resnetadv_kl{i+1}' : lambda *x, i=i, j=j: make_resnetadvanced(*x, j, f'kl{i+1}')
         for i, j in enumerate(kls) }
 
 if __name__ == "__main__":
