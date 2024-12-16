@@ -34,6 +34,7 @@ def global_accuracy(d, method):
 # 		'fdr': fdr
 # 	}
 
+
 def roc_curve(d, method, polarity):
 	nc = f'{method}_ncorr'
 	fpr = []; tpr = []
@@ -58,16 +59,32 @@ def auroc(d, method):
 	return {
 		'auroc': (roc_curve(d, method, +1)[0] + roc_curve(d, method, -1)[0])/2
 	}
+
 def nfdr(d, method):
 	return {
 		'nfdr10': (d.obs[f'{method}_ncorr_thresh'] != 0).sum()
 	}
 
+def truefdr(d, method):
+	case_regions = d.obs[d.obs.case_region > 0.9]
+	ctrl_regions = d.obs[d.obs.ctrl_region > 0.9]
+	null_regions = d.obs[d.obs.region == 0]
+
+	nct = f'{method}_ncorr_thresh'
+	if (d.obs[nct] != 0).sum() == 0:
+		fdr = 0
+	else:
+		fdr = (null_regions[nct] != 0).sum() / (d.obs[nct] != 0).sum()
+
+	return {
+		'truefdr' : fdr,
+	}
+
 def metrics(d, method):
-	return global_accuracy(d, method) | auroc(d, method) | nfdr(d, method)
+	return global_accuracy(d, method) | auroc(d, method) | nfdr(d, method) | truefdr(d, method)
 
 def metric_names():
-	return ['correlation', 'auroc', 'nfdr10']
+	return ['correlation', 'auroc', 'nfdr10', 'truefdr']
 
 def cna_cc(d, seed=0, **kwargs):
 	annotate_patches(d)

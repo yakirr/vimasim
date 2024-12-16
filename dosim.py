@@ -1,13 +1,14 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import tpae.data.samples as tds
-import tpae.data.patchcollection as tdp
-import tpae.training as tt
-import tpae.association as ta
-import tpae.vis as tv
-from tpaesim import synthesize
-import tpaesim.cc
+import vima.data.samples as tds
+import vima.data.patchcollection as tdp
+import vima.training as tt
+import vima.association as ta
+import vima.vis as tv
+from vimasim import synthesize
+import vimasim.cc
+import scanpy as sc
 import gc, os
 import cv2 as cv2
 import xarray as xr
@@ -16,21 +17,27 @@ import os.path
 
 import torch
 
-def make_trivial(P, modelfilename, n_epochs):
+def make_avg(P, modelfilename, n_epochs):
     P.augmentation_off()
     P.numpy_mode()
 
     Zs = {}
-    Zs['trivial-avg'] = P[:][0][:,:,:,:].mean(axis=(1,2))
-    Zs['trivial-pixels'] = P[:][0].reshape((len(P), -1))
-    Zs['trivial-cov'] = np.array([z.T.dot(z)[np.triu_indices(P.nchannels)]
-        for z in P[:][0].reshape((len(P), -1, P.nchannels))])
+    Zs['avg'] = P[:][0][:,:,:,:].mean(axis=(1,2))
+
+    return Zs
+
+def make_pixelpcs(P, modelfilename, n_epochs):
+    P.augmentation_off()
+    P.numpy_mode()
+
+    Zs = {}
+    Zs['allpixels'] = P[:][0].reshape((len(P), -1))
 
     return Zs
 
 def make_simplecnn(P, modelfilename, n_epochs, kl_weight, stem):
     print(kl_weight, stem)
-    from tpae.models.simple_vae import SimpleVAE
+    from vima.models.simple_vae import SimpleVAE
     modelparams = {
         'ncolors':P.nchannels,
         'patch_size':patchsize,
@@ -52,7 +59,7 @@ def make_simplecnn(P, modelfilename, n_epochs, kl_weight, stem):
 
 def make_resnetsimple(P, modelfilename, n_epochs, kl_weight, stem):
     print(kl_weight, stem)
-    from tpae.models.resnet_vae import ResnetVAE
+    from vima.models.resnet_vae import ResnetVAE
     model = ResnetVAE(len(P.meta.sid.unique()), network='light', mode='simple', ncolors=P.nchannels)
     if os.path.isfile(modelfilename):
         model.load_state_dict(torch.load(modelfilename))
@@ -70,10 +77,11 @@ def make_resnetsimple(P, modelfilename, n_epochs, kl_weight, stem):
 
     return Zs
 
-def make_resnetadvanced(P, modelfilename, n_epochs, kl_weight, stem):
+def make_resnetadvanced(P, modelfilename, n_epochs, kl_weight, nlatent, stem):
     print(kl_weight, stem)
-    from tpae.models.resnet_vae import ResnetVAE
-    model = ResnetVAE(len(P.meta.sid.unique()), network='light', mode='advanced', ncolors=P.nchannels)
+    from vima.models.resnet_vae import ResnetVAE
+    model = ResnetVAE(len(P.meta.sid.unique()), network='light', mode='advanced',
+                nlatent=nlatent, ncolors=P.nchannels)
     if os.path.isfile(modelfilename):
         model.load_state_dict(torch.load(modelfilename))
     else:
@@ -90,20 +98,22 @@ def make_resnetadvanced(P, modelfilename, n_epochs, kl_weight, stem):
     return Zs
 
 signal_adders = {
+    'null' : synthesize.add_null,
     'agg_v_nothing' : synthesize.add_aggregates_v_nothing,
     'agg_v_diffuse' : synthesize.add_aggregates_v_diffuse,
     'linear_v_circular' : synthesize.add_linear_v_circular
 }
 
-kls = [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 10]
+kls = [0, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 10]
 rep_makers = {
-    'trivial' : make_trivial } | \
+    'avg' : make_avg,
+    'pixelpcs' : make_pixelpcs } | \
     { f'simplecnn_kl{i+1}' : lambda *x, i=i, j=j: make_simplecnn(*x, j, f'kl{i+1}')
-        for i, j in enumerate(kls) } | \
+        for i, j in enumerate(kls, start=-1) } | \
     { f'resnetsimple_kl{i+1}' : lambda *x, i=i, j=j: make_resnetsimple(*x, j, f'kl{i+1}')
-        for i, j in enumerate(kls) } | \
-    { f'resnetadv_kl{i+1}' : lambda *x, i=i, j=j: make_resnetadvanced(*x, j, f'kl{i+1}')
-        for i, j in enumerate(kls) }
+        for i, j in enumerate(kls, start=-1) } | \
+    { f'resnetadv_kl{i+1}' : lambda *x, i=i, j=j: make_resnetadvanced(*x, j, 100, f'kl{i+1}')
+        for i, j in enumerate(kls, start=-1) }
 
 if __name__ == "__main__":
     # Initialize the parser
@@ -125,9 +135,20 @@ if __name__ == "__main__":
     print(args)
     if args.torch_device is not None:
         torch.set_default_device(args.torch_device)
+    sc.settings.n_jobs = -1
+
+    if args.rep_family == 'pixelpcs' and args.npcs == -1:
+        args.npcs = 20
+        print('npcs set to', args.npcs)
+
+    styles = [
+        ('clust', vimasim.cc.cluster_cc),
+        ('cna', vimasim.cc.cna_cc)]
+    if args.rep_family != 'resnetadv_kl5':
+        styles = [styles[1]]
 
     if args.d:
-        stop_after=15; max_frac_empty=0.3; n_epochs=1
+        stop_after=20; max_frac_empty=0.5; n_epochs=2
     else:
         stop_after=None; max_frac_empty=0.8; n_epochs=10
     outstem = f'{args.outdir}/{args.signal_type}.{args.rep_family}.{args.seed}'
@@ -171,7 +192,7 @@ if __name__ == "__main__":
         }
 
     # Perform two case-control anlayses for each representation and noise level
-    results = pd.DataFrame(columns=['signal', 'repname', 'style', 'noise', 'P'] + tpaesim.cc.metric_names())
+    results = pd.DataFrame(columns=['signal', 'repname', 'style', 'noise', 'P'] + vimasim.cc.metric_names())
     noises = [0, 0.1, 0.2, 0.3, 0.4, 0.5]
 
     if os.path.isfile(f'{outstem}.tsv'):
@@ -179,10 +200,7 @@ if __name__ == "__main__":
     for repname, D in Ds.items():
         for noise in noises:
             D.samplem['noisy_case'] = (D.samplem.case + np.random.binomial(1, noise, size=D.N)) % 2
-            for style, cc in [
-                    ('clust', tpaesim.cc.cluster_cc),
-                    ('cna', tpaesim.cc.cna_cc),
-                    ]:
+            for style, cc in styles:
                 p, metrics = cc(D)
                 results.loc[len(results)] = {
                     "signal": args.signal_type,

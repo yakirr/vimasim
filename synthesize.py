@@ -3,7 +3,7 @@ import numpy as np
 import xarray as xr
 import cv2 as cv2
 import matplotlib.pyplot as plt
-import tpae.data.samples as tds
+import vima.data.samples as tds
 
 cells = pd.read_csv('../alz-data/SEAAD_MTG_MERFISH_metadata.2024-05-03.noblanks.harmonized.txt', delimiter='\t')
 
@@ -62,6 +62,21 @@ def plot_changes(tissue_mask, region_mask, newpx_case, newpx_ctrl, celltype, dis
     celltype.plot(ax=ax)
     ax.axis('equal')
     plt.show()
+
+def add_null(samples, plot=False):
+    # determine case/ctrl status
+    samples, samplemeta = set_cc(samples)
+
+    # add in signal
+    region_masks = {}
+    for sid, r in samplemeta.iterrows():
+        print(sid, r.case, end='|')
+        s = samples[sid]
+
+        # determine tissue boundaries and region of interest
+        tissue_mask, region_masks[sid] = define_tissue_and_region(s)
+
+    return samples, samplemeta, region_masks
 
 def add_aggregates_v_nothing(samples, pc='hPC2', plot=False):
     # determine case/ctrl status
