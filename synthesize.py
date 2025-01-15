@@ -23,13 +23,20 @@ def get_region(s, cell_types=['L2/3 IT']):
     layer.data = cv2.morphologyEx(layer.data.astype(np.uint8), cv2.MORPH_OPEN, np.ones((10,10),np.uint8)) 
     return layer.astype('bool')
 
-def set_cc(samples):
-    samplemeta = pd.DataFrame({'donor':[s.attrs['donor'] for s in samples.values()]},
-                               index=[s.attrs['sid'] for s in samples.values()]).drop_duplicates()
+def set_cc(samples, downsample=True):
+    samplemeta = pd.DataFrame({
+            'donor':[s.attrs['donor'] for s in samples.values()]
+        },
+        index=[s.attrs['sid'] for s in samples.values()]
+        )
+    if downsample:
+        samplemeta = samplemeta.drop_duplicates()
     samples = {sid:samples[sid] for sid in samplemeta.index}
-    cases = np.random.choice(samplemeta.index, size=len(samplemeta)//2, replace=False)
+    cases = np.random.binomial(1, 0.5, size=len(samplemeta.donor.unique())).astype(bool)
+    cases = samplemeta.donor.unique()[cases]
     samplemeta['case'] = 0
-    samplemeta.loc[cases, 'case'] = 1
+    samplemeta.loc[samplemeta.donor.isin(cases), 'case'] = 1
+    
     return samples, samplemeta
 
 def define_tissue_and_region(s):
@@ -146,9 +153,9 @@ def add_aggregates_v_diffuse(samples, pc='hPC2', plot=False):
 
     return samples, samplemeta, region_masks
 
-def add_linear_v_circular(samples, pc='hPC2', plot=False):
+def add_linear_v_circular(samples, pc='hPC2', plot=False, downsample=True):
     # determine case/ctrl status
-    samples, samplemeta = set_cc(samples)
+    samples, samplemeta = set_cc(samples, downsample=downsample)
 
     # add in signal
     region_masks = {}
@@ -173,8 +180,12 @@ def add_linear_v_circular(samples, pc='hPC2', plot=False):
         newpx_ctrl[~region_masks[sid]] = 0
         newpx_ctrl *= (region_masks[sid].flatten().sum() / newpx_ctrl.flatten().sum())
         
+        # noise = np.random.gamma(shape=50.0, scale=1/50, size=newpx_case.shape)
+        noise = np.ones(newpx_case.shape)
+        print('noise 0.5 :', noise.mean(), noise.std())
+
         # add
-        dist = newpx_case if r.case == 1 else newpx_ctrl
+        dist = newpx_case*noise if r.case == 1 else newpx_ctrl*noise
         celltype += dist
 
         # visualize
