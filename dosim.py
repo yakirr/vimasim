@@ -7,6 +7,8 @@ import vima.training as tt
 import vima.association as ta
 import vima.vis as tv
 from vimasim import synthesize
+synthesize.init()
+
 import vimasim.cc
 import scanpy as sc
 import gc, os
@@ -14,6 +16,7 @@ import cv2 as cv2
 import xarray as xr
 import argparse
 import os.path
+
 
 import torch
 

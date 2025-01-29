@@ -5,7 +5,10 @@ import cv2 as cv2
 import matplotlib.pyplot as plt
 import vima.data.samples as tds
 
-cells = pd.read_csv('../alz-data/SEAAD_MTG_MERFISH_metadata.2024-05-03.noblanks.harmonized.txt', delimiter='\t')
+cells = None
+def init(cellspath='../alz-data/SEAAD_MTG_MERFISH_metadata.2024-05-03.noblanks.harmonized.txt'):
+    global cells
+    cells = pd.read_csv(cellspath, delimiter='\t')
 
 def get_region(s, cell_types=['L2/3 IT']):
     mask = tds.get_mask(s)
@@ -23,7 +26,7 @@ def get_region(s, cell_types=['L2/3 IT']):
     layer.data = cv2.morphologyEx(layer.data.astype(np.uint8), cv2.MORPH_OPEN, np.ones((10,10),np.uint8)) 
     return layer.astype('bool')
 
-def set_cc(samples, downsample=True):
+def set_cc(samples, downsample=True, forcecase=None):
     samplemeta = pd.DataFrame({
             'donor':[s.attrs['donor'] for s in samples.values()]
         },
@@ -34,9 +37,12 @@ def set_cc(samples, downsample=True):
     samples = {sid:samples[sid] for sid in samplemeta.index}
     cases = np.random.binomial(1, 0.5, size=len(samplemeta.donor.unique())).astype(bool)
     cases = samplemeta.donor.unique()[cases]
-    samplemeta['case'] = 0
-    samplemeta.loc[samplemeta.donor.isin(cases), 'case'] = 1
-    
+    if forcecase is None:
+        samplemeta['case'] = 0
+        samplemeta.loc[samplemeta.donor.isin(cases), 'case'] = 1
+    else:
+        samplemeta['case'] = forcecase
+
     return samples, samplemeta
 
 def define_tissue_and_region(s):
@@ -61,7 +67,7 @@ def plot_changes(tissue_mask, region_mask, newpx_case, newpx_ctrl, celltype, dis
     ax.set_title('ctrl')
     ax.axis('off')
     plt.show()
-
+    
     ax = plt.subplot(1,2,1)
     (celltype-dist).plot(ax=ax)
     ax.axis('equal')
@@ -85,9 +91,9 @@ def add_null(samples, plot=False):
 
     return samples, samplemeta, region_masks
 
-def add_aggregates_v_nothing(samples, pc='hPC2', plot=False):
-    # determine case/ctrl status
-    samples, samplemeta = set_cc(samples)
+def add_aggregates_v_nothing(samples, pc='hPC2', plot=False, forcecase=None):
+    # determine case/ctrl status        
+    samples, samplemeta = set_cc(samples, forcecase=forcecase)
 
     # add in signal
     region_masks = {}
@@ -118,9 +124,9 @@ def add_aggregates_v_nothing(samples, pc='hPC2', plot=False):
 
     return samples, samplemeta, region_masks
 
-def add_aggregates_v_diffuse(samples, pc='hPC2', plot=False):
+def add_aggregates_v_diffuse(samples, pc='hPC2', plot=False, forcecase=None):
     # determine case/ctrl status
-    samples, samplemeta = set_cc(samples)
+    samples, samplemeta = set_cc(samples, forcecase=forcecase)
 
     # add in signal
     region_masks = {}
@@ -153,9 +159,9 @@ def add_aggregates_v_diffuse(samples, pc='hPC2', plot=False):
 
     return samples, samplemeta, region_masks
 
-def add_linear_v_circular(samples, pc='hPC2', plot=False, downsample=True):
+def add_linear_v_circular(samples, pc='hPC2', plot=False, downsample=True, forcecase=None):
     # determine case/ctrl status
-    samples, samplemeta = set_cc(samples, downsample=downsample)
+    samples, samplemeta = set_cc(samples, downsample=downsample, forcecase=forcecase)
 
     # add in signal
     region_masks = {}
