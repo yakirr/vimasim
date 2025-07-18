@@ -26,6 +26,8 @@ def make_avg(P, modelfilename, n_epochs):
 
     Zs = {}
     Zs['avg'] = P[:][0][:,:,:,:].mean(axis=(1,2))
+    Zs['avg'] -= Zs['avg'].mean(axis=0)
+    Zs['avg'] /= Zs['avg'].std(axis=0)
 
     return Zs
 
@@ -35,6 +37,8 @@ def make_pixelpcs(P, modelfilename, n_epochs):
 
     Zs = {}
     Zs['allpixels'] = P[:][0].reshape((len(P), -1))
+    Zs['allpixels'] -= Zs['allpixels'].mean(axis=0)
+    Zs['allpixels'] /= Zs['allpixels'].std(axis=0)
 
     return Zs
 
@@ -44,15 +48,15 @@ def make_simplecnn(P, modelfilename, n_epochs, kl_weight, stem):
     modelparams = {
         'ncolors':P.nchannels,
         'patch_size':patchsize,
-        'nfilters1':512,
-        'nfilters2':1024,
+        'nfilters1':64,
+        'nfilters2':128,
     }
     model = SimpleVAE(**modelparams)
     if os.path.isfile(modelfilename):
         model.load_state_dict(torch.load(modelfilename))
     else:
         train_dataset, val_dataset = tt.train_test_split(P)
-        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
         model, losslogs = tt.full_training(model, train_dataset, val_dataset, optimizer, scheduler, batch_size=256, n_epochs=n_epochs,
                                         kl_weight=kl_weight, kl_warmup=True)
@@ -115,7 +119,7 @@ rep_makers = {
         for i, j in enumerate(kls, start=-1) } | \
     { f'resnetsimple_kl{i+1}' : lambda *x, i=i, j=j: make_resnetsimple(*x, j, f'kl{i+1}')
         for i, j in enumerate(kls, start=-1) } | \
-    { f'resnetadv_kl{i+1}' : lambda *x, i=i, j=j: make_resnetadvanced(*x, j, 100, f'kl{i+1}')
+    { f'resnetadv_kl{i+1}' : lambda *x, i=i, j=j: make_resnetadvanced(*x, j, 20, f'kl{i+1}')
         for i, j in enumerate(kls, start=-1) }
 
 if __name__ == "__main__":
